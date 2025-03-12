@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Countdown zum letzten Arbeitstag</title>
+  <!-- Einbinden von FontAwesome für Icons und Google Fonts (Roboto) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #007BFF;
+      --background-color: #ffffff; /* Hintergrund der Seite: Weiß */
+      --text-color: #333333;
+      --free-bg-color: #e6f7ff;
+      --working-bg-color: #f0faff;
+      --header-overlay: rgba(0, 0, 0, 0.4);
+      --border-color: #dddddd;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      line-height: 1.6;
+    }
+    /* Hero Header (vollflächiges Header-Foto mit Overlay) */
+    header.hero {
+      position: relative;
+      width: 100%;
+      height: 300px;
+      background: url('https://placeimg.com/1600/900/nature?random=1') center center/cover no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-image 1s ease-in-out;
+    }
+    header.hero .hero-overlay {
+      background-color: var(--header-overlay);
+      padding: 20px 30px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    header.hero .hero-overlay h1 {
+      color: #fff;
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+    header.hero .hero-overlay p {
+      color: #fff;
+      font-size: 1.2em;
+    }
+    /* Container für den Hauptinhalt */
+    .container {
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    /* Flip Clock Timer (Klapp-Zahlen) */
+    .flip-clock {
+      margin: 40px auto;
+      text-align: center;
+    }
+    .flip-card {
+      display: inline-block;
+      perspective: 1000px;
+    }
+    .flip-card span {
+      display: inline-block;
+      padding: 20px 30px;
+      background: var(--working-bg-color);
+      border: 2px solid var(--primary-color);
+      border-radius: 8px;
+      font-size: 3em;
+      font-weight: 500;
+      color: var(--primary-color);
+      transition: transform 0.7s;
+      transform-style: preserve-3d;
+    }
+    .flip-clock p {
+      margin-top: 10px;
+      font-size: 1.1em;
+    }
+    /* Kalenderübersicht */
+    table {
+      width: 100%;
+      max-width: 800px;
+      border-collapse: collapse;
+      margin: 40px auto;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    th, td {
+      border: 1px solid var(--border-color);
+      padding: 15px;
+      text-align: center;
+      min-height: 80px;
+    }
+    th {
+      background-color: #f8f9fa;
+      font-weight: 500;
+      color: var(--primary-color);
+    }
+    .free-day {
+      background-color: var(--free-bg-color);
+    }
+    .working-day {
+      background-color: var(--working-bg-color);
+    }
+    .date-number {
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .remaining {
+      font-size: 0.9em;
+      color: var(--text-color);
+    }
+    /* Responsive Anpassungen */
+    @media (max-width: 600px) {
+      header.hero { height: 200px; }
+      header.hero .hero-overlay h1 { font-size: 2em; }
+      .flip-card span { font-size: 2em; padding: 15px 20px; }
+      th, td { padding: 10px; min-height: 60px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Hero Header mit dynamischem Header-Foto (nur Urlaubsfotos via PlaceIMG) -->
+  <header class="hero">
+    <div class="hero-overlay">
+      <h1>Countdown zum letzten Arbeitstag</h1>
+      <p>Am 4. Juni ist Schicht-Tag!</p>
+    </div>
+  </header>
+  
+  <div class="container">
+    <!-- Flip Clock Countdown -->
+    <div class="flip-clock">
+      <div class="flip-card" id="flip-card">
+        <span id="flip-number">0</span>
+      </div>
+      <p>Bernd, nur noch <span id="workdays-text"></span> Arbeitstage!</p>
+    </div>
+    
+    <!-- Kalenderübersicht -->
+    <h2 style="text-align: center; margin-bottom: 20px;">
+      <i class="fas fa-calendar-alt"></i> Kalenderübersicht
+    </h2>
+    <div id="calendar-container"></div>
+  </div>
+  
+  <script>
+    // Normalisiert ein Datum auf Mitternacht (00:00:00)
+    function normalizeDate(date) {
+      let d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    
+    // Prüft, ob ein Datum ein Arbeitstag ist (Samstag, Sonntag und Feiertage gelten als frei)
+    function isWorkingDay(date) {
+      const day = date.getDay();
+      if (day === 0 || day === 6) return false;
+      const holidays = [
+        "2025-04-18", // Karfreitag
+        "2025-04-21", // Ostermontag
+        "2025-05-01", // Tag der Arbeit
+        "2025-05-29"  // Christi Himmelfahrt
+      ];
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const dateString = `${yyyy}-${mm}-${dd}`;
+      return !holidays.includes(dateString);
+    }
+    
+    // Zählt die Arbeitstage von startDate bis endDate (inklusive endDate)
+    function countWorkingDays(startDate, endDate) {
+      let count = 0;
+      let current = normalizeDate(startDate);
+      const end = normalizeDate(endDate);
+      while (current <= end) {
+        if (isWorkingDay(current)) count++;
+        current.setDate(current.getDate() + 1);
+      }
+      return count;
+    }
+    
+    // Zählt die verbleibenden Arbeitstage ab dem aktuellen Datum.
+    // Ist der aktuelle Tag ein Arbeitstag, wird er mitgezählt, sodass am 4. Juni „1“ erscheint.
+    function countRemainingWorkdays(currentDate, endDate) {
+      let start = normalizeDate(currentDate);
+      if (!isWorkingDay(start)) start.setDate(start.getDate() + 1);
+      return countWorkingDays(start, endDate);
+    }
+    
+    // Aktualisiert den Flip Clock Countdown mit einer Flip-Animation
+    function updateFlipClock(number) {
+      const flipCard = document.getElementById("flip-card");
+      const flipNumber = document.getElementById("flip-number");
+      flipCard.style.transform = "rotateX(-90deg)";
+      setTimeout(() => {
+        flipNumber.innerText = number;
+        flipCard.style.transform = "rotateX(0deg)";
+      }, 350);
+    }
+    
+    // Aktualisiert den Countdown
+    function updateCountdown() {
+      const today = normalizeDate(new Date());
+      const targetDate = normalizeDate(new Date("2025-06-04"));
+      if (today > targetDate) {
+        document.getElementById("flip-number").innerText = "0";
+        document.getElementById("workdays-text").innerText = "0 (Bereits in Rente)";
+      } else {
+        const remainingWorkdays = countRemainingWorkdays(today, targetDate);
+        updateFlipClock(remainingWorkdays);
+        document.getElementById("workdays-text").innerText = remainingWorkdays;
+      }
+    }
+    
+    // Generiert eine Kalenderübersicht vom 1. des aktuellen Monats bis zum 4. Juni.
+    // Vergangene Tage (vor heute) werden mit einem großen roten X markiert.
+    function generateCalendar() {
+      const calendarContainer = document.getElementById("calendar-container");
+      const table = document.createElement("table");
+      
+      // Kopfzeile mit den Wochentagen (inkl. Icons)
+      const headerRow = document.createElement("tr");
+      const daysOfWeek = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+      for (let day of daysOfWeek) {
+        const th = document.createElement("th");
+        th.innerHTML = `<i class="fas fa-calendar-alt"></i> ${day}`;
+        headerRow.appendChild(th);
+      }
+      table.appendChild(headerRow);
+      
+      const today = normalizeDate(new Date());
+      // Starte ab dem 1. des aktuellen Monats
+      const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      const targetDate = normalizeDate(new Date("2025-06-04"));
+      let current = new Date(startDate);
+      
+      // Leere Zellen für die erste Woche, wenn der 1. nicht Montag ist
+      let startDay = current.getDay();
+      startDay = (startDay === 0) ? 7 : startDay;
+      let row = document.createElement("tr");
+      for (let i = 1; i < startDay; i++) {
+        const emptyCell = document.createElement("td");
+        row.appendChild(emptyCell);
+      }
+      
+      // Iteriere von startDate bis targetDate
+      while (current <= targetDate) {
+        const cell = document.createElement("td");
+        const dayNum = current.getDate();
+        const monthNum = current.getMonth() + 1;
+        const dateDiv = document.createElement("div");
+        dateDiv.className = "date-number";
+        dateDiv.innerText = `${dayNum}.${monthNum}.`;
+        cell.appendChild(dateDiv);
+        
+        // Liegt das Datum in der Vergangenheit (kleiner als heute), dann markiere mit einem großen roten X
+        if (current < today) {
+          cell.innerHTML += '<div class="remaining" style="font-size:2em; color:red;">&#10006;</div>';
+        } else {
+          if (isWorkingDay(current)) {
+            cell.classList.add("working-day");
+            const remaining = countRemainingWorkdays(current, targetDate);
+            const remainingDiv = document.createElement("div");
+            remainingDiv.className = "remaining";
+            remainingDiv.innerText = `Noch ${remaining} Arbeitstage`;
+            cell.appendChild(remainingDiv);
+          } else {
+            cell.classList.add("free-day");
+            const freeDiv = document.createElement("div");
+            freeDiv.className = "remaining";
+            freeDiv.innerText = `Frei`;
+            cell.appendChild(freeDiv);
+          }
+        }
+        
+        row.appendChild(cell);
+        if (row.children.length === 7) {
+          table.appendChild(row);
+          row = document.createElement("tr");
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      while (row.children.length < 7) {
+        const emptyCell = document.createElement("td");
+        row.appendChild(emptyCell);
+      }
+      table.appendChild(row);
+      calendarContainer.appendChild(table);
+    }
+    
+    // Dynamisches Header-Foto: Aktualisiere das Headerbild alle 5 Sekunden mithilfe von PlaceIMG
+    function updateHeaderImage() {
+      const header = document.querySelector("header.hero");
+      header.style.backgroundImage = "url('https://placeimg.com/1600/900/nature?random=" + Math.random() + "')";
+    }
+    setInterval(updateHeaderImage, 5000);
+    updateHeaderImage();
+    
+    updateCountdown();
+    generateCalendar();
+  </script>
+</body>
+</html>
